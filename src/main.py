@@ -1,6 +1,4 @@
 import datetime
-import os
-import platform
 
 import psutil
 from wox_plugin import (
@@ -17,19 +15,16 @@ from wox_plugin import (
     WoxImageType,
 )
 
-# Import macOS specific modules if running on macOS
-if platform.system() == "Darwin":
-    try:
-        from AppKit import NSWorkspace
-    except ImportError:
-        pass
+from .process_name_resolver import ProcessNameResolver
 
 
 class KillProcessPlugin(Plugin):
     api: PublicAPI
+    name_resolver: ProcessNameResolver
 
     async def init(self, ctx: Context, init_params: PluginInitParams) -> None:
         self.api = init_params.api
+        self.name_resolver = ProcessNameResolver()
 
     def on_refresh(self, r: RefreshableResult) -> RefreshableResult:
         r.sub_title = f"Refresh at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -54,39 +49,6 @@ class KillProcessPlugin(Plugin):
         except ValueError:
             await self.api.notify(Context.new(), "Invalid process ID")
 
-    def get_friendly_name(self, proc) -> str:
-        try:
-            # macOS specific handling
-            if platform.system() == "Darwin":
-                try:
-                    # Try to get the application name using NSRunningApplication
-                    workspace = NSWorkspace.sharedWorkspace()
-                    for app in workspace.runningApplications():
-                        if app.processIdentifier() == proc.pid:
-                            # Get the localized name of the application
-                            if app.localizedName():
-                                return str(app.localizedName())
-                            break
-                except Exception:  # Catch specific AppKit related exceptions
-                    pass
-
-            # Generic handling for other platforms or fallback
-            if hasattr(proc, "exe"):
-                try:
-                    exe_path = proc.exe()
-                    # For macOS, try to get the app name from the .app bundle
-                    if platform.system() == "Darwin" and ".app/" in exe_path:
-                        app_path = exe_path[: exe_path.find(".app/") + 4]
-                        return os.path.splitext(os.path.basename(app_path))[0]
-                    return os.path.splitext(os.path.basename(exe_path))[0]
-                except (psutil.AccessDenied, psutil.NoSuchProcess):
-                    pass
-
-            # Fallback to process name if exe is not available
-            return proc.info["name"]
-        except Exception:  # Catch any remaining exceptions to ensure we always return a name
-            return proc.info["name"]
-
     async def query(self, ctx: Context, query: Query) -> list[Result]:
         results: list[Result] = []
         search_term = query.search.lower() if query.search else ""
@@ -96,7 +58,7 @@ class KillProcessPlugin(Plugin):
             try:
                 pinfo = proc.info
                 process_name = pinfo["name"].lower()
-                friendly_name = self.get_friendly_name(proc)
+                friendly_name = self.name_resolver.get_friendly_name(proc)
 
                 # Filter processes if search term exists
                 if search_term and search_term not in process_name and search_term not in friendly_name.lower():

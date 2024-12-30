@@ -12,9 +12,11 @@ dependencies = [
     "pyobjc",
 ]
 
-
 [project.optional-dependencies]
-dev = ["ruff", "mypy"]
+dev = [
+    "ruff",
+    "mypy"
+]
 
 [tool.ruff]
 line-length = 140

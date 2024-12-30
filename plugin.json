@@ -10,7 +10,7 @@
     "MinWoxVersion": "2.0.0",
     "Runtime": "python",
     "Website": "https://github.com/Wox-launcher/Wox.Plugin.KillProcess",
-    "Entry": "main.py",
+    "Entry": "killprocess/main.py",
     "Icon": "relative:image/app.png",
     "SupportedOS": [
         "windows",
