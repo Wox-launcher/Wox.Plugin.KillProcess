@@ -163,3 +163,7 @@ cython_debug/
 
 
 *.pyz
+dist/
+wox.plugin.killprocess.wox
+.mypy_cache/
+.ruff_cache/
