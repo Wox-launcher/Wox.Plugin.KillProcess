@@ -1,16 +1,16 @@
 {
-    "Id": "replaceme_with_id",
+    "Id": "cb491ba6-e73f-4434-922e-738a55f87558",
     "TriggerKeywords": [
-        "replaceme_with_keyword"
+        "kill"
     ],
-    "Name": "replaceme_with_name",
-    "Description": "replaceme_with_description",
+    "Name": "Kill Process",
+    "Description": "Terminate a running process by its name or ID",
     "Author": "",
     "Version": "0.0.1",
     "MinWoxVersion": "2.0.0",
     "Runtime": "python",
-    "Website": "replaceme_with_website",
-    "Entry": "replaceme_with_projectname/main.py",
+    "Website": "https://github.com/Wox-Launcher/Wox.Plugin.KillProcess",
+    "Entry": "killprocess/main.py",
     "Icon": "relative:image/app.png",
     "SupportedOS": [
         "windows",

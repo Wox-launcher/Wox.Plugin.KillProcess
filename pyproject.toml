@@ -1,11 +1,15 @@
 [project]
-name = "replaceme_with_projectname"
+name = "killprocess"
 version = "0.1.0"
-description = "replace_with_description"
+description = "Terminate a running process by its name or ID"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "wox-plugin==0.0.48"
+    "wox-plugin==0.0.48",
+    "psutil",
+    "types-psutil",
+    "pyobjc-framework-Cocoa",
+    "pyobjc",
 ]
 
 [project.optional-dependencies]

@@ -1,9 +1,4 @@
-# Wox.Plugin.replaceme_with_projectname
-
-# How to use this template
-
-- clone this repository
-- search all text `replaceme_with_` and replace with your value
+# Wox.Plugin.KillProcess
 
 # Build
 `make build`
