@@ -3,8 +3,8 @@
     "TriggerKeywords": [
         "kill"
     ],
-    "Name": "Kill Process",
-    "Description": "Terminate a running process by its name or ID",
+    "Name": "i18n:plugin_name",
+    "Description": "i18n:plugin_description",
     "Author": "",
     "Version": "0.0.1",
     "MinWoxVersion": "2.0.0",
@@ -19,6 +19,8 @@
     ],
     "I18n": {
         "en_US": {
+            "plugin_name": "Kill Process",
+            "plugin_description": "Terminate a running process by its name or ID",
             "process_title": "{friendly_name}",
             "tail_pid": "PID: {pid}",
             "tail_memory": "{memory_mb} MB",
@@ -30,6 +32,8 @@
             "notify_invalid_pid": "Invalid process ID"
         },
         "zh_CN": {
+            "plugin_name": "进程杀手",
+            "plugin_description": "通过进程名称或 ID 终止正在运行的进程",
             "process_title": "{friendly_name}",
             "tail_pid": "PID: {pid}",
             "tail_memory": "{memory_mb} MB",
