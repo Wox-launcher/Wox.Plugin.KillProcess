@@ -3,7 +3,7 @@ requires-python = ">=3.10"
 
 [[package]]
 name = "killprocess"
-version = "0.1.0"
+version = "0.0.2"
 source = { virtual = "." }
 dependencies = [
     { name = "psutil" },
@@ -27,7 +27,7 @@ requires-dist = [
     { name = "pyobjc-framework-cocoa" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "types-psutil" },
-    { name = "wox-plugin", specifier = "==0.0.48" },
+    { name = "wox-plugin", specifier = "==0.0.69" },
 ]
 
 [[package]]
@@ -2847,9 +2847,9 @@ wheels = [
 
 [[package]]
 name = "wox-plugin"
-version = "0.0.48"
+version = "0.0.69"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/59/e7/1a4f6701f653d7243d8ec35b29aad8e377760e03a61092e3950b53f2aadb/wox_plugin-0.0.48.tar.gz", hash = "sha256:132820a60dddc5d130c049ce302aba519b10e6a409e87453be393472f55153ba", size = 34994 }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/d7/458f1e48cc9c972b49f1c6e4724c9a1785b39a1a9101af4076ea64649eaa/wox_plugin-0.0.69.tar.gz", hash = "sha256:3f8463335eff3ed25f40a83dbeebe49604f70249fe2981cc2f93bd939b2a82e3", size = 66670 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f2/68/0b131ae43f8a95fb2f8eb6f36c69606accb0c2729544ea92082256bd9957/wox_plugin-0.0.48-py3-none-any.whl", hash = "sha256:5a34cd5a59f8dbd218a45618ee00ce0c4c50e03d39f1dc237fcbd0ad34f013d5", size = 10386 },
+    { url = "https://files.pythonhosted.org/packages/0f/6e/00aa75b1300d6a47a211fd179cd7450ccc06a005cdf9dc7e673c2753866d/wox_plugin-0.0.69-py3-none-any.whl", hash = "sha256:8c3ecffa064c245512f9aabdd1b4b089aae88d81039cede0630105c733aafe74", size = 46660 },
 ]

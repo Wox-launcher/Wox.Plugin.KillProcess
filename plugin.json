@@ -16,5 +16,29 @@
         "windows",
         "linux",
         "darwin"
-    ]
+    ],
+    "I18n": {
+        "en_US": {
+            "process_title": "{friendly_name}",
+            "tail_pid": "PID: {pid}",
+            "tail_memory": "{memory_mb} MB",
+            "kill_action": "Kill Process",
+            "notify_success": "Successfully terminated process {pid}",
+            "notify_no_process": "Process {pid} no longer exists",
+            "notify_access_denied": "Access denied when trying to kill process {pid}",
+            "notify_error": "Error killing process {pid}: {error}",
+            "notify_invalid_pid": "Invalid process ID"
+        },
+        "zh_CN": {
+            "process_title": "{friendly_name}",
+            "tail_pid": "PID: {pid}",
+            "tail_memory": "{memory_mb} MB",
+            "kill_action": "结束进程",
+            "notify_success": "成功终止进程 {pid}",
+            "notify_no_process": "进程 {pid} 已不存在",
+            "notify_access_denied": "没有权限终止进程 {pid}",
+            "notify_error": "终止进程 {pid} 时出错: {error}",
+            "notify_invalid_pid": "无效的进程 ID"
+        }
+    }
 }

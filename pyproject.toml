@@ -1,11 +1,11 @@
 [project]
 name = "killprocess"
-version = "0.1.0"
+version = "0.0.2"
 description = "Terminate a running process by its name or ID"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "wox-plugin==0.0.48",
+    "wox-plugin==0.0.69",
     "psutil",
     "types-psutil",
     "pyobjc-framework-Cocoa",
@@ -13,10 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "ruff",
-    "mypy"
-]
+dev = ["ruff", "mypy"]
 
 [tool.ruff]
 line-length = 140
