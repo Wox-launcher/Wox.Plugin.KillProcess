@@ -1,12 +1,9 @@
 # Wox.Plugin.KillProcess
 
-# Build
-`make build`
+A Wox plugin to kill processes by name.
 
-# Build wox file which is ready for distribute
-`make publish`
+![](image/screenshot.png)
 
-# Recommand extensions for vscode
-- ms-python.python
-- charliermarsh.ruff
-- ms-python.mypy-type-checker
+## Installation
+
+`wpm install killprocess`
