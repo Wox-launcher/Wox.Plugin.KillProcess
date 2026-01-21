@@ -1,10 +1,13 @@
+# ruff: noqa: E402
+from .dynamic_deps import ensure_package
+
+psutil = ensure_package("psutil", plugin_name="killprocess")  # type: ignore[assignment]
+
 import asyncio
 import platform
 import uuid
 from dataclasses import dataclass, field
 from typing import Dict
-
-import psutil
 from wox_plugin import (
     ActionContext,
     Context,

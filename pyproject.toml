@@ -6,14 +6,10 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "wox-plugin==0.0.69",
-    "psutil",
-    "types-psutil",
-    "pyobjc-framework-Cocoa; sys_platform == 'darwin'",
-    "pyobjc; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]
-dev = ["ruff", "mypy"]
+dev = ["ruff", "mypy", "psutil", "types-psutil"]
 
 [tool.ruff]
 line-length = 140
