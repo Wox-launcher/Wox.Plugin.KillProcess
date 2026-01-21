@@ -8,8 +8,8 @@ dependencies = [
     "wox-plugin==0.0.69",
     "psutil",
     "types-psutil",
-    "pyobjc-framework-Cocoa",
-    "pyobjc",
+    "pyobjc-framework-Cocoa; sys_platform == 'darwin'",
+    "pyobjc; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]
