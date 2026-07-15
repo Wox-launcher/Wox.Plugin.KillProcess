@@ -7,6 +7,7 @@ Usage:
     psutil = ensure_package("psutil")
 """
 
+import importlib
 import os
 import subprocess
 import sys
@@ -28,6 +29,13 @@ def _ensure_pip() -> None:
         ensurepip.bootstrap(upgrade=True)
 
 
+def _clear_package_modules(package_name: str) -> None:
+    """Remove failed modules before importing the newly installed package."""
+    for mod in list(sys.modules.keys()):
+        if mod == package_name or mod.startswith(f"{package_name}."):
+            del sys.modules[mod]
+
+
 def ensure_package(package_name: str, plugin_name: str = "default") -> types.ModuleType:
     """
     Ensure a package is available, installing it if necessary.
@@ -47,7 +55,7 @@ def ensure_package(package_name: str, plugin_name: str = "default") -> types.Mod
 
     # Try importing first
     try:
-        module = __import__(package_name)
+        module = importlib.import_module(package_name)
         # Verify module is functional (not a broken partial install)
         if hasattr(module, "__version__") or hasattr(module, "__file__"):
             return module
@@ -55,9 +63,7 @@ def ensure_package(package_name: str, plugin_name: str = "default") -> types.Mod
         pass
 
     # Clear any broken cached imports
-    for mod in list(sys.modules.keys()):
-        if mod == package_name or mod.startswith(f"{package_name}."):
-            del sys.modules[mod]
+    _clear_package_modules(package_name)
 
     # Install to cache directory
     try:
@@ -67,16 +73,8 @@ def ensure_package(package_name: str, plugin_name: str = "default") -> types.Mod
             [sys.executable, "-m", "pip", "install", package_name, "--target", cache_dir, "--upgrade", "--quiet"],
             check=True,
         )
-        return __import__(package_name)
-    except Exception:
-        pass
-
-    # Fallback: try user installation
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", package_name, "--user", "--quiet"],
-            check=False,
-        )
-        return __import__(package_name)
-    except Exception:
-        raise ImportError(f"Failed to install or import {package_name}")
+        importlib.invalidate_caches()
+        _clear_package_modules(package_name)
+        return importlib.import_module(package_name)
+    except Exception as e:
+        raise ImportError(f"Failed to install or import {package_name}: {e}") from e
