@@ -6,7 +6,7 @@
     "Name": "i18n:plugin_name",
     "Description": "i18n:plugin_description",
     "Author": "Wox-Launcher",
-    "Version": "0.0.3",
+    "Version": "0.0.4",
     "MinWoxVersion": "2.0.0",
     "Runtime": "python",
     "Website": "https://github.com/Wox-Launcher/Wox.Plugin.KillProcess",

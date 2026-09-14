@@ -3,10 +3,9 @@ from .dynamic_deps import ensure_package
 
 psutil = ensure_package("psutil", plugin_name="killprocess")  # type: ignore[assignment]
 
-import asyncio
 import platform
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict
 from wox_plugin import (
     ActionContext,
@@ -25,30 +24,32 @@ from wox_plugin import (
 
 from .process_name_resolver import ProcessNameResolver
 
+_RESULT_LIMIT = 20
+_I18N_DEFAULTS = {
+    "process_title": "{friendly_name}",
+    "tail_pid": "PID: {pid}",
+    "tail_memory": "{memory_mb} MB",
+    "notify_success": "Successfully terminated process {pid}",
+    "notify_no_process": "Process {pid} no longer exists",
+    "notify_access_denied": "Access denied when trying to kill process {pid}",
+    "notify_error": "Error killing process {pid}: {error}",
+}
+
 
 @dataclass
 class ProcessInfo:
     pid: int
     name: str
     exe_path: str
-    username: str
     memory_mb: float
     friendly_name: str
-
-
-@dataclass
-class TrackedResult:
-    result_id: str
-    pid: int
 
 
 class MyPlugin(Plugin):
     api: PublicAPI
     name_resolver: ProcessNameResolver
     _processes: Dict[int, ProcessInfo] = field(default_factory=dict)
-    _tracked_results: Dict[str, TrackedResult] = field(default_factory=dict)
-    _refresh_task: asyncio.Task | None = None
-    _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    _templates: Dict[str, str] = field(default_factory=lambda: dict(_I18N_DEFAULTS))
 
     @staticmethod
     def _format_app_path(exe_path: str) -> str:
@@ -57,10 +58,8 @@ class MyPlugin(Plugin):
             return exe_path
 
         if platform.system() == "Darwin":
-            # Find .app in the path and truncate to that level
             app_index = exe_path.find(".app")
             if app_index != -1:
-                # Include the .app part
                 return exe_path[: app_index + 4]
 
         return exe_path
@@ -69,15 +68,17 @@ class MyPlugin(Plugin):
         self.api = init_params.api
         self.name_resolver = ProcessNameResolver()
         self._processes = {}
-        self._tracked_results = {}
-        self._lock = asyncio.Lock()
+        self._templates = dict(_I18N_DEFAULTS)
+        for key in _I18N_DEFAULTS:
+            self._templates[key] = await self.api.get_translation(_ctx, key)
+        self._processes = self._collect_processes({})
 
-        # Start background refresh task
-        self._refresh_task = asyncio.create_task(self._refresh_processes_loop())
-
-    async def _t(self, ctx: Context, key: str, **kwargs) -> str:
-        """Get translated string with parameter substitution."""
-        template = await self.api.get_translation(ctx, key)
+    def _t(self, key: str, **kwargs) -> str:
+        """Format a cached translation. Avoid per-result GetTranslation RPCs."""
+        templates = getattr(self, "_templates", None)
+        if not isinstance(templates, dict):
+            templates = _I18N_DEFAULTS
+        template = templates.get(key) or _I18N_DEFAULTS.get(key, key)
         if kwargs:
             return template.format(**kwargs)
         return template
@@ -86,13 +87,13 @@ class MyPlugin(Plugin):
         try:
             process = psutil.Process(pid)
             process.terminate()
-            await self.api.notify(ctx, await self._t(ctx, "notify_success", pid=str(pid)))
+            await self.api.notify(ctx, self._t("notify_success", pid=str(pid)))
         except psutil.NoSuchProcess:
-            await self.api.notify(ctx, await self._t(ctx, "notify_no_process", pid=str(pid)))
+            await self.api.notify(ctx, self._t("notify_no_process", pid=str(pid)))
         except psutil.AccessDenied:
-            await self.api.notify(ctx, await self._t(ctx, "notify_access_denied", pid=str(pid)))
+            await self.api.notify(ctx, self._t("notify_access_denied", pid=str(pid)))
         except Exception as e:
-            await self.api.notify(ctx, await self._t(ctx, "notify_error", pid=str(pid), error=str(e)))
+            await self.api.notify(ctx, self._t("notify_error", pid=str(pid), error=str(e)))
 
     async def action(self, _ctx: Context, actionContext: ActionContext):
         try:
@@ -101,152 +102,117 @@ class MyPlugin(Plugin):
         except ValueError:
             await self.api.notify(Context.new(), "i18n:notify_invalid_pid")
 
-    async def _refresh_processes_loop(self) -> None:
-        """Background task to periodically refresh process list."""
-        while True:
-            await self._refresh_processes()
-            await asyncio.sleep(1)
+    def _collect_processes(self, previous: Dict[int, ProcessInfo]) -> Dict[int, ProcessInfo]:
+        """List processes with pid+name only. memory_info/create_time block the Python host."""
+        new_processes: Dict[int, ProcessInfo] = {}
 
-    async def _refresh_processes(self) -> None:
-        """Refresh the cached process list and update tracked results."""
-        async with self._lock:
-            new_processes: Dict[int, ProcessInfo] = {}
-
-            for proc in psutil.process_iter(["pid", "name", "username", "memory_info"]):
-                try:
-                    pinfo = proc.info
-                    proc_obj = psutil.Process(pinfo["pid"])
-                    friendly_name = self.name_resolver.get_friendly_name(proc_obj)
-
-                    memory_mb = 0
-                    try:
-                        memory_info = pinfo["memory_info"]
-                        memory_mb = memory_info.rss / (1024 * 1024) if memory_info else 0
-                    except Exception:
-                        pass
-
-                    exe_path = ""
-                    try:
-                        exe_path = proc_obj.exe() or ""
-                    except Exception:
-                        pass
-
-                    new_processes[pinfo["pid"]] = ProcessInfo(
-                        pid=pinfo["pid"],
-                        name=pinfo["name"],
-                        exe_path=exe_path,
-                        username=pinfo["username"] or "N/A",
-                        memory_mb=memory_mb,
-                        friendly_name=friendly_name,
-                    )
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        for proc in psutil.process_iter(["pid", "name"]):
+            try:
+                pinfo = proc.info
+                pid = pinfo["pid"]
+                name = pinfo["name"] or ""
+                cached = previous.get(pid)
+                if cached is not None and cached.name == name:
+                    new_processes[pid] = cached
                     continue
 
-            self._processes = new_processes
-
-            # Update tracked results
-            await self._update_tracked_results()
-
-    async def _create_tails(self, ctx: Context, proc_info: ProcessInfo) -> list[ResultTail]:
-        """Create result tails for PID and memory info."""
-        tails = []
-
-        # PID tail
-        pid_text = await self._t(ctx, "tail_pid", pid=str(proc_info.pid))
-        tails.append(ResultTail(type=ResultTailType.TEXT, text=pid_text))
-
-        # Memory tail
-        memory_text = await self._t(ctx, "tail_memory", memory_mb=f"{proc_info.memory_mb:.1f}")
-        tails.append(ResultTail(type=ResultTailType.TEXT, text=memory_text))
-
-        return tails
-
-    async def _update_tracked_results(self) -> None:
-        """Update all tracked results with fresh process data."""
-        to_remove: list[str] = []
-        ctx = Context.new()
-
-        for result_id, tracked in self._tracked_results.items():
-            # Check if process still exists
-            process = self._processes.get(tracked.pid)
-            if not process:
-                to_remove.append(result_id)
+                new_processes[pid] = ProcessInfo(
+                    pid=pid,
+                    name=name,
+                    exe_path=cached.exe_path if cached else "",
+                    memory_mb=cached.memory_mb if cached else 0.0,
+                    friendly_name=cached.friendly_name if cached else name,
+                )
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
 
-            try:
-                # Get updatable result (returns None if no longer visible)
-                updatable = await self.api.get_updatable_result(ctx, result_id)
-                if updatable is None:
-                    to_remove.append(result_id)
-                    continue
+        return new_processes
 
-                # Update the result data
-                updatable.title = await self._t(ctx, "process_title", friendly_name=process.friendly_name, pid=str(process.pid))
-                updatable.sub_title = self._format_app_path(process.exe_path) or process.name
-                updatable.tails = await self._create_tails(ctx, process)
+    def _hydrate_details(self, proc_info: ProcessInfo) -> ProcessInfo:
+        """Read memory/exe only for rows we are about to show."""
+        try:
+            proc = psutil.Process(proc_info.pid)
+            memory_mb = proc.memory_info().rss / (1024 * 1024)
+            exe_path = proc_info.exe_path
+            if not exe_path:
+                try:
+                    exe_path = proc.exe() or ""
+                except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
+                    exe_path = ""
+            friendly_name = self.name_resolver.get_friendly_name(
+                proc,
+                default_name=proc_info.name,
+                exe_path=exe_path,
+            )
+            return replace(
+                proc_info,
+                memory_mb=memory_mb,
+                exe_path=exe_path,
+                friendly_name=friendly_name,
+            )
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            return proc_info
 
-                # Try to update the result
-                success = await self.api.update_result(ctx, updatable)
-                if not success:
-                    # Result no longer visible
-                    to_remove.append(result_id)
-            except Exception:
-                to_remove.append(result_id)
+    def _create_tails(self, proc_info: ProcessInfo) -> list[ResultTail]:
+        """Create result tails for PID and memory info."""
+        return [
+            ResultTail(type=ResultTailType.TEXT, text=self._t("tail_pid", pid=str(proc_info.pid))),
+            ResultTail(
+                type=ResultTailType.TEXT,
+                text=self._t("tail_memory", memory_mb=f"{proc_info.memory_mb:.1f}"),
+            ),
+        ]
 
-        # Remove stale results
-        for result_id in to_remove:
-            self._tracked_results.pop(result_id, None)
+    @staticmethod
+    def _matches_search(proc_info: ProcessInfo, search_term: str) -> bool:
+        return (
+            search_term in proc_info.name.lower()
+            or search_term in proc_info.friendly_name.lower()
+            or search_term in proc_info.exe_path.lower()
+        )
+
+    def _select_processes(self, search_term: str) -> list[ProcessInfo]:
+        """Return the top memory consumers, optionally filtered by search."""
+        search_term = search_term.strip().lower()
+        processes = list(self._processes.values())
+        if search_term:
+            processes = [item for item in processes if self._matches_search(item, search_term)]
+        processes.sort(key=lambda item: item.memory_mb, reverse=True)
+        return processes[:_RESULT_LIMIT]
+
+    def _build_result(self, proc_info: ProcessInfo, search_term: str) -> Result:
+        process_name = proc_info.name.lower()
+        friendly_name = proc_info.friendly_name
+        result_id = str(uuid.uuid4())
+        exec_path = self._format_app_path(proc_info.exe_path) or proc_info.name
+        return Result(
+            title=self._t("process_title", friendly_name=friendly_name, pid=str(proc_info.pid)),
+            sub_title=exec_path,
+            icon=WoxImage(image_type=WoxImageType.FILE_ICON, image_data=exec_path),
+            tails=self._create_tails(proc_info),
+            actions=[
+                ResultAction(
+                    name="i18n:kill_action",
+                    context_data={"pid": str(proc_info.pid)},
+                    prevent_hide_after_action=True,
+                    action=self.action,
+                )
+            ],
+            id=result_id,
+            score=(
+                int(proc_info.memory_mb)
+                if not search_term
+                else (100 if search_term in process_name or search_term in friendly_name.lower() else 50)
+            ),
+        )
 
     async def query(self, ctx: Context, query: Query) -> list[Result]:
-        results: list[Result] = []
-        search_term = query.search.lower() if query.search else ""
-
-        # Clear previous tracked results
-        self._tracked_results.clear()
-
-        # Use cached process list
-        async with self._lock:
-            for pid, proc_info in list(self._processes.items()):
-                process_name = proc_info.name.lower()
-                friendly_name = proc_info.friendly_name
-                exe_path = proc_info.exe_path.lower()
-
-                # Filter processes if search term exists
-                if (
-                    search_term
-                    and search_term not in process_name
-                    and search_term not in friendly_name.lower()
-                    and search_term not in exe_path
-                ):
-                    continue
-
-                result_id = str(uuid.uuid4())
-                exec_path = self._format_app_path(proc_info.exe_path) or proc_info.name
-                result = Result(
-                    title=await self._t(ctx, "process_title", friendly_name=friendly_name, pid=str(pid)),
-                    sub_title=exec_path,
-                    icon=WoxImage(image_type=WoxImageType.FILE_ICON, image_data=exec_path),
-                    tails=await self._create_tails(ctx, proc_info),
-                    actions=[
-                        ResultAction(
-                            name="i18n:kill_action",
-                            context_data={"pid": str(pid)},
-                            prevent_hide_after_action=True,
-                            action=self.action,
-                        )
-                    ],
-                    id=result_id,
-                    score=(100 if search_term and (search_term in process_name or search_term in friendly_name.lower()) else 50),
-                )
-                results.append(result)
-
-                # Track this result for updates
-                self._tracked_results[result_id] = TrackedResult(
-                    result_id=result_id,
-                    pid=pid,
-                )
-
-        return results
+        search_term = query.search.strip().lower() if query.search else ""
+        self._processes = self._collect_processes(self._processes)
+        selected = [self._hydrate_details(item) for item in self._select_processes(search_term)]
+        for item in selected:
+            self._processes[item.pid] = item
+        return [self._build_result(item, search_term) for item in selected]
 
 
 plugin = MyPlugin()
